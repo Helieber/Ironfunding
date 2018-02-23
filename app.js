@@ -21,6 +21,8 @@ mongoose.connect('mongodb://localhost:27017/ironfunds-development');
 
 const index = require('./routes/index');
 const users = require('./routes/users');
+const authRoutes = require('./routes/authentication.js');
+const campaignRoutes = require('./routes/campaigns.js');
 
 const app = express();
 
@@ -32,8 +34,7 @@ app.set('layout', 'layouts/main-layout');
 app.use(expressLayouts);
 
 
-const authRoutes = require('./routes/authentication.js');
-app.use('/', authRoutes);
+
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
@@ -50,6 +51,7 @@ app.use(session({
   store: new MongoStore( { mongooseConnection: mongoose.connection })
 }))
 
+// Passport Configuration
 passport.serializeUser((user, cb) => {
   cb(null, user.id);
 });
@@ -94,6 +96,22 @@ passport.use('local-signup', new LocalStrategy(
     });
 }));
 
+passport.use('local-login', new LocalStrategy((username, password, next) => {
+  User.findOne({ username }, (err, user) => {
+    if (err) {
+      return next(err);
+    }
+    if (!user) {
+      return next(null, false, { message: "Incorrect username" });
+    }
+    if (!bcrypt.compareSync(password, user.password)) {
+      return next(null, false, { message: "Incorrect password" });
+    }
+
+    return next(null, user);
+  });
+}));
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -109,7 +127,8 @@ app.use( (req, res, next) => {
 
 app.use('/', index);
 app.use('/users', users);
-
+app.use('/', authRoutes);
+app.use('/campaigns', campaignRoutes);
 
 
 // catch 404 and forward to error handler
